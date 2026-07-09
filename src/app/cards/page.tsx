@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -10,7 +10,7 @@ import { CardEditor } from '@/components/card/CardEditor';
 import { getAllDecks } from '@/lib/db/deckRepo';
 import { searchCards, createCard, deleteCard } from '@/lib/db/cardRepo';
 
-export default function CardsPage() {
+function CardsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const action = searchParams?.get('action');
@@ -209,5 +209,13 @@ export default function CardsPage() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+export default function CardsPage() {
+  return (
+    <Suspense fallback={<div className="animate-fadeIn page-header"><div><h1 className="page-title">載入中...</h1></div></div>}>
+      <CardsContent />
+    </Suspense>
   );
 }
