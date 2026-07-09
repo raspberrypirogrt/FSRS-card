@@ -11,32 +11,41 @@ export async function POST(req: NextRequest) {
 
     const { text, prompt, fileBase64, mimeType, modelId } = await req.json();
 
-    const selectedModel = modelId || 'gemini-1.5-flash';
-    const model = genAI.getGenerativeModel({ model: selectedModel });
+    const selectedModel = modelId || 'gemini-2.0-flash';
+    const model = genAI.getGenerativeModel({ 
+      model: selectedModel,
+      generationConfig: {
+        responseMimeType: "application/json"
+      }
+    });
 
     const systemInstruction = `
 你是一個專業的記憶卡（Flashcard）產生器。你的任務是從使用者提供的文本或圖片中，萃取核心知識點，並產生高品質的問答卡片。
-這些卡片將被用於間隔重複學習（Spaced Repetition）。
 
-**要求：**
-1. **精準度**：問題必須明確，答案必須精確簡潔。
+## 卡片設計原則
+1. **精簡扼要**：正面（題目）應該是一個明確的問題或概念名詞；背面（答案）應該是簡潔的解釋。
 2. **適度分割**：如果一個觀念太複雜，請將其拆分為多張卡片（Atomic 原則）。
 3. **支援 LaTeX**：如果是數學公式或工程數學，請使用 LaTeX 語法（使用 $ 包覆單行公式，$$ 包覆獨立區塊公式）。
-4. **輸出格式**：你必須嚴格輸出 JSON 陣列格式，不要包含額外的 Markdown 標籤，只能輸出純 JSON。
-請確保輸出時「務必使用 Markdown 語法」，並且若有數學公式或專業符號，「務必使用 LaTeX 格式」（例如使用單個 $ 包住行內公式，或使用雙 $$ 包住獨立區塊公式）。
 
-產出的 JSON 格式如下：
+## 輸出格式要求
+請確保輸出時「務必使用 Markdown 語法」，並且若有數學公式或專業符號，「務必使用 LaTeX 格式」。
+你的輸出必須是合法的 JSON 格式。這非常重要！不要輸出 markdown code block 符號 (```json)，直接輸出 JSON 字串。
+
+產出的 JSON Schema 格式如下：
 {
   "cards": [
     { "front": "問題或知識點正面", "back": "答案或知識點背面" }
   ]
 }
-請不要輸出任何 JSON 以外的文字。
+
 例如：
-[
-  { "front": "什麼是 $E=mc^2$？", "back": "質能等價公式，表示質量與能量的轉換關係。" }
-]
-    `;
+{
+  "cards": [
+    { "front": "什麼是 $E=mc^2$？", "back": "質能等價公式，表示質量與能量的轉換關係。" },
+    { "front": "解釋 **Atomic 原則**", "back": "指在製作記憶卡時，一張卡片只測試一個核心概念，避免過度複雜。" }
+  ]
+}
+`;
 
     const contents: any[] = [];
     
@@ -67,15 +76,17 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    const responseText = result.response.text();
-    let cards = [];
-    
-    try {
-      cards = JSON.parse(responseText);
-    } catch (e) {
-      // 嘗試清理 markdown 區塊
-      const cleaned = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-      cards = JSON.parse(cleaned);
+    const textResponse = result.response.text();
+      
+    // 有些模型可能會多包一層 ```json，我們手動清掉它以防萬一
+    const rawText = textResponse.replace(/^```json/g, '').replace(/```$/g, '').trim();
+      
+    const parsedData = JSON.parse(rawText);
+    let cards = parsedData.cards || [];
+      
+    // 相容如果 AI 只回傳陣列
+    if (Array.isArray(parsedData) && parsedData.length > 0 && parsedData[0].front) {
+      cards = parsedData;
     }
 
     return NextResponse.json({ cards });
