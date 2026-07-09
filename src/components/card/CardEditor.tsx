@@ -65,12 +65,22 @@ export function CardEditor({ initialFront = '', initialBack = '', onChange }: Ca
           <div style={{ padding: 'var(--space-sm) 0', fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
             即時預覽
           </div>
-          <div className="card" style={{ flex: 1, minHeight: '300px', overflowY: 'auto' }}>
-            {activeTab === 'front' ? (
-              front ? <MarkdownLatex content={front} /> : <span style={{ color: 'var(--text-muted)' }}>尚未輸入內容</span>
-            ) : (
-              back ? <MarkdownLatex content={back} /> : <span style={{ color: 'var(--text-muted)' }}>尚未輸入內容</span>
-            )}
+          <div 
+            className="card" 
+            style={{ flex: 1, minHeight: '300px', overflowY: 'auto', cursor: 'pointer', position: 'relative' }}
+            onClick={() => setActiveTab(activeTab === 'front' ? 'back' : 'front')}
+            title="點擊翻面"
+          >
+            <div style={{ position: 'absolute', top: '8px', right: '12px', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', background: 'var(--surface)', padding: '2px 8px', borderRadius: 'var(--radius-full)' }}>
+              點擊翻面 🔄
+            </div>
+            <div style={{ paddingTop: '24px' }}>
+              {activeTab === 'front' ? (
+                front ? <MarkdownLatex content={front} /> : <span style={{ color: 'var(--text-muted)' }}>尚未輸入內容</span>
+              ) : (
+                back ? <MarkdownLatex content={back} /> : <span style={{ color: 'var(--text-muted)' }}>尚未輸入內容</span>
+              )}
+            </div>
           </div>
         </div>
       </div>

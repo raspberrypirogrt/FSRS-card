@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { getAllDecks } from '@/lib/db/deckRepo';
 import { createCard } from '@/lib/db/cardRepo';
 import { useToast } from '@/components/ui/Toast';
+import { MarkdownLatex } from '@/components/ui/MarkdownLatex';
 import mammoth from 'mammoth';
 
 // Dynamic import for pdfjs will happen inside extractPdfText to avoid SSR DOMMatrix error
@@ -12,6 +13,7 @@ interface GeneratedCard {
   id: string; // for UI list key
   front: string;
   back: string;
+  isEditing?: boolean; // 新增狀態來控制預覽/編輯
 }
 
 const AI_MODELS = [
@@ -20,8 +22,6 @@ const AI_MODELS = [
   { id: 'gemini-3-flash', name: 'Gemini 3 Flash' },
   { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite' },
   { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash' },
-  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
-  { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
 ];
 
 export default function AIGeneratePage() {
@@ -316,32 +316,62 @@ export default function AIGeneratePage() {
               <div style={{ flex: 1, overflowY: 'auto', paddingRight: 'var(--space-sm)' }}>
                 {generatedCards.map((card, idx) => (
                   <div key={card.id} style={{ marginBottom: 'var(--space-md)', padding: 'var(--space-md)', background: 'var(--surface)', borderRadius: 'var(--radius-md)', position: 'relative' }}>
-                    <button 
-                      className="btn-icon btn-ghost" 
-                      style={{ position: 'absolute', top: 5, right: 5 }}
-                      onClick={() => handleDeleteCard(card.id)}
-                      title="刪除此卡片"
-                    >
-                      ✕
-                    </button>
-                    <div style={{ marginBottom: 'var(--space-sm)' }}>
-                      <strong style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-xs)', display: 'block', marginBottom: '4px' }}>正面 (題目)</strong>
-                      <textarea 
-                        className="textarea" 
-                        value={card.front} 
-                        onChange={(e) => handleCardChange(card.id, 'front', e.target.value)}
-                        rows={2}
-                      />
+                    <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: '8px' }}>
+                      <button 
+                        className="btn-icon btn-ghost" 
+                        onClick={() => handleCardChange(card.id, 'isEditing' as any, card.isEditing ? false : true as any)}
+                        title={card.isEditing ? "切換至預覽" : "切換至編輯"}
+                      >
+                        {card.isEditing ? '👁️' : '✏️'}
+                      </button>
+                      <button 
+                        className="btn-icon btn-ghost" 
+                        onClick={() => handleDeleteCard(card.id)}
+                        title="刪除此卡片"
+                      >
+                        ✕
+                      </button>
                     </div>
-                    <div>
-                      <strong style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-xs)', display: 'block', marginBottom: '4px' }}>背面 (解答)</strong>
-                      <textarea 
-                        className="textarea" 
-                        value={card.back} 
-                        onChange={(e) => handleCardChange(card.id, 'back', e.target.value)}
-                        rows={3}
-                      />
-                    </div>
+
+                    {!card.isEditing ? (
+                      <div style={{ marginTop: '24px' }}>
+                        <div style={{ marginBottom: 'var(--space-md)' }}>
+                          <strong style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-xs)', display: 'block', marginBottom: '8px' }}>正面 (題目)</strong>
+                          <div style={{ padding: 'var(--space-sm)', background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)' }}>
+                            <MarkdownLatex content={card.front} />
+                          </div>
+                        </div>
+                        <div>
+                          <strong style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-xs)', display: 'block', marginBottom: '8px' }}>背面 (解答)</strong>
+                          <div style={{ padding: 'var(--space-sm)', background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)' }}>
+                            <MarkdownLatex content={card.back} />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: '24px' }}>
+                        <div style={{ marginBottom: 'var(--space-sm)' }}>
+                          <strong style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-xs)', display: 'block', marginBottom: '4px' }}>正面 (題目)</strong>
+                          <textarea 
+                            className="textarea" 
+                            value={card.front} 
+                            onChange={(e) => handleCardChange(card.id, 'front', e.target.value)}
+                            rows={3}
+                            style={{ fontFamily: 'var(--font-mono)' }}
+                          />
+                        </div>
+                        <div>
+                          <strong style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-xs)', display: 'block', marginBottom: '4px' }}>背面 (解答)</strong>
+                          <textarea 
+                            className="textarea" 
+                            value={card.back} 
+                            onChange={(e) => handleCardChange(card.id, 'back', e.target.value)}
+                            rows={4}
+                            style={{ fontFamily: 'var(--font-mono)' }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
