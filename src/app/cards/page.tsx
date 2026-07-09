@@ -8,12 +8,14 @@ import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { CardEditor } from '@/components/card/CardEditor';
 import { getAllDecks } from '@/lib/db/deckRepo';
-import { searchCards, createCard, deleteCard } from '@/lib/db/cardRepo';
+import { searchCards, createCard, deleteCard, updateCard, getCard } from '@/lib/db/cardRepo';
 
 function CardsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const action = searchParams?.get('action');
+  const editId = searchParams?.get('edit');
+  const initialDeckId = searchParams?.get('deckId');
   
   const { showToast } = useToast();
   const decks = useLiveQuery(() => getAllDecks());
@@ -22,8 +24,9 @@ function CardsContent() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const cards = useLiveQuery(() => searchCards(debouncedQuery), [debouncedQuery]);
   
-  const [isEditorOpen, setIsEditorOpen] = useState(action === 'new');
-  const [selectedDeckId, setSelectedDeckId] = useState('');
+  const [isEditorOpen, setIsEditorOpen] = useState(action === 'new' || !!editId);
+  const [editingCardId, setEditingCardId] = useState<string | null>(editId || null);
+  const [selectedDeckId, setSelectedDeckId] = useState(initialDeckId || '');
   const [cardFront, setCardFront] = useState('');
   const [cardBack, setCardBack] = useState('');
 
@@ -38,12 +41,30 @@ function CardsContent() {
   // 如果帶有 action=new 參數，自動打開新增對話框
   useEffect(() => {
     if (action === 'new' && decks && decks.length > 0 && !selectedDeckId) {
-      setSelectedDeckId(decks[0].id);
+      setSelectedDeckId(initialDeckId || decks[0].id);
       setIsEditorOpen(true);
+      setEditingCardId(null);
+      setCardFront('');
+      setCardBack('');
     }
-  }, [action, decks, selectedDeckId]);
+  }, [action, decks, selectedDeckId, initialDeckId]);
 
-  const handleCreateCard = async () => {
+  // 如果帶有 edit 參數，載入卡片資料
+  useEffect(() => {
+    if (editId) {
+      setIsEditorOpen(true);
+      setEditingCardId(editId);
+      getCard(editId).then(card => {
+        if (card) {
+          setSelectedDeckId(card.deckId);
+          setCardFront(card.front);
+          setCardBack(card.back);
+        }
+      });
+    }
+  }, [editId]);
+
+  const handleSaveCard = async () => {
     if (!selectedDeckId) {
       showToast('請先選擇一個牌組', 'warning');
       return;
@@ -54,19 +75,30 @@ function CardsContent() {
     }
 
     try {
-      await createCard({
-        deckId: selectedDeckId,
-        front: cardFront,
-        back: cardBack,
-        tags: [],
-      });
-      showToast('卡片新增成功！', 'success');
-      setCardFront('');
-      setCardBack('');
-      // 如果不是連續新增，可以關閉 Modal
-      // setIsEditorOpen(false);
+      if (editingCardId) {
+        // 更新現有卡片
+        await updateCard(editingCardId, {
+          deckId: selectedDeckId,
+          front: cardFront,
+          back: cardBack,
+        });
+        showToast('卡片更新成功！', 'success');
+        setIsEditorOpen(false);
+        router.replace('/cards');
+      } else {
+        // 新增卡片
+        await createCard({
+          deckId: selectedDeckId,
+          front: cardFront,
+          back: cardBack,
+          tags: [],
+        });
+        showToast('卡片新增成功！', 'success');
+        setCardFront('');
+        setCardBack('');
+      }
     } catch (error) {
-      showToast('新增卡片失敗', 'error');
+      showToast('儲存卡片失敗', 'error');
     }
   };
 
@@ -93,6 +125,9 @@ function CardsContent() {
             className="btn btn-primary"
             onClick={() => {
               if (decks && decks.length > 0) setSelectedDeckId(decks[0].id);
+              setEditingCardId(null);
+              setCardFront('');
+              setCardBack('');
               setIsEditorOpen(true);
             }}
           >
@@ -152,7 +187,19 @@ function CardsContent() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
-                  {/* 編輯功能待實作 */}
+                  <button 
+                    className="btn-icon btn-ghost" 
+                    onClick={() => {
+                      setEditingCardId(card.id);
+                      setSelectedDeckId(card.deckId);
+                      setCardFront(card.front);
+                      setCardBack(card.back);
+                      setIsEditorOpen(true);
+                    }} 
+                    title="編輯"
+                  >
+                    ✏️
+                  </button>
                   <button className="btn-icon btn-ghost" onClick={() => handleDeleteCard(card.id)} title="刪除">
                     🗑️
                   </button>
@@ -170,11 +217,13 @@ function CardsContent() {
           setIsEditorOpen(false);
           router.replace('/cards');
         }}
-        title="新增記憶卡"
+        title={editingCardId ? "編輯記憶卡" : "新增記憶卡"}
         footer={
           <>
             <button className="btn btn-ghost" onClick={() => setIsEditorOpen(false)}>取消</button>
-            <button className="btn btn-primary" onClick={handleCreateCard}>儲存並新增下一張</button>
+            <button className="btn btn-primary" onClick={handleSaveCard}>
+              {editingCardId ? "儲存變更" : "儲存並新增下一張"}
+            </button>
           </>
         }
       >

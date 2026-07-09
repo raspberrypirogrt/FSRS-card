@@ -9,9 +9,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'GEMINI_API_KEY is not configured' }, { status: 500 });
     }
 
-    const { text, prompt, fileBase64, mimeType } = await req.json();
+    const { text, prompt, fileBase64, mimeType, modelId } = await req.json();
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const selectedModel = modelId || 'gemini-1.5-flash';
+    const model = genAI.getGenerativeModel({ model: selectedModel });
 
     const systemInstruction = `
 你是一個專業的記憶卡（Flashcard）產生器。你的任務是從使用者提供的文本或圖片中，萃取核心知識點，並產生高品質的問答卡片。
