@@ -61,9 +61,14 @@ export async function POST(req: NextRequest) {
 2. **適度分割**：如果一個觀念太複雜，請將其拆分為多張卡片（Atomic 原則）。
 3. **支援 LaTeX**：如果是數學公式或工程數學，請使用 LaTeX 語法（使用 $ 包覆單行公式，$$ 包覆獨立區塊公式）。
 
-## 輸出格式要求
+## 輸出格式要求與 JSON 轉義規則 (非常重要)
 請確保輸出時「務必使用 Markdown 語法」，並且若有數學公式或專業符號，「務必使用 LaTeX 格式」。
-你的輸出必須是合法的 JSON 格式。這非常重要！不要輸出 markdown code block 符號 (\`\`\`json)，直接輸出 JSON 字串。
+**因為你的輸出必須是嚴格的 JSON 格式，在 JSON 字串中的所有 LaTeX 反斜線 (backslash) 都必須被「雙重轉義 (Double Escaped)」。**
+- 錯誤範例 (會導致解析失敗)：{"back": "特徵值為 \\lambda，且 \\neq 0"}
+- 正確範例 (雙重轉義)：{"back": "特徵值為 \\\\lambda，且 \\\\neq 0"}
+- 正確範例 (雙重轉義)：{"back": "分子為 \\\\frac{1}{2}"}
+
+不要輸出 markdown code block 符號 (\`\`\`json)，直接輸出 JSON 字串。
 
 產出的 JSON Schema 格式如下：
 {
@@ -76,7 +81,7 @@ export async function POST(req: NextRequest) {
 {
   "cards": [
     { "front": "什麼是 $E=mc^2$？", "back": "質能等價公式，表示質量與能量的轉換關係。" },
-    { "front": "解釋 **Atomic 原則**", "back": "指在製作記憶卡時，一張卡片只測試一個核心概念，避免過度複雜。" }
+    { "front": "特徵值的定義？", "back": "若存在非零向量 $v$ 使得 $Av = \\\\lambda v$，則稱 \\\\lambda 為特徵值。" }
   ]
 }
 `;
