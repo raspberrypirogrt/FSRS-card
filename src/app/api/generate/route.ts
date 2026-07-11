@@ -66,6 +66,8 @@ export async function POST(req: NextRequest) {
 
 ## 輸出格式要求與 JSON 轉義規則 (非常重要)
 請確保輸出時「務必使用 Markdown 語法」，並且若有數學公式或專業符號，「務必使用 LaTeX 格式」。
+**如果需要在卡片內容中換行，請絕對不要使用 \\n，請一律使用 HTML 標籤 <br> 來產生換行。**
+
 **因為你的輸出必須是嚴格的 JSON 格式，在 JSON 字串中的所有 LaTeX 反斜線 (backslash) 都必須被「雙重轉義 (Double Escaped)」。**
 - 錯誤範例 (會導致解析失敗)：{"back": "特徵值為 \\lambda，且 \\neq 0"}
 - 正確範例 (雙重轉義)：{"back": "特徵值為 \\\\lambda，且 \\\\neq 0"}
