@@ -238,7 +238,7 @@ export default function AIGeneratePage() {
                         onClick={() => fileInputRef.current?.click()}
                         style={{ flex: 1, justifyContent: 'center' }}
                       >
-                        📁 選擇檔案 (支援多選圖片/PDF/Word)
+                        📁 選擇檔案
                       </button>
                       <button 
                         className="btn btn-secondary" 
