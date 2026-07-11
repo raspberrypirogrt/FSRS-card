@@ -4,19 +4,38 @@ import { GoogleGenAI } from '@google/genai';
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 function extractJson(text: string) {
+  if (!text) throw new Error("AI 沒有回傳任何內容 (可能是因為安全過濾機制攔截)。");
+  
   try {
     return JSON.parse(text);
   } catch(e) {
-    const start = text.search(/[\{\[]/);
-    const end = text.search(/[\}\]][^}\]]*$/);
-    if (start !== -1 && end !== -1 && start <= end) {
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    const firstBracket = text.indexOf('[');
+    const lastBracket = text.lastIndexOf(']');
+    
+    let start = -1;
+    let end = -1;
+    
+    if (firstBrace !== -1 && lastBrace !== -1 && firstBrace < lastBrace) {
+      start = firstBrace;
+      end = lastBrace;
+    }
+    if (firstBracket !== -1 && lastBracket !== -1 && firstBracket < lastBracket) {
+      if (start === -1 || (firstBracket < start && lastBracket > end)) {
+        start = firstBracket;
+        end = lastBracket;
+      }
+    }
+    
+    if (start !== -1 && end !== -1) {
       try {
         return JSON.parse(text.substring(start, end + 1));
       } catch (e2) {
-        throw new Error("無法解析 AI 回傳的 JSON 格式。");
+        throw new Error(`無法解析 JSON。原始片段: ${text.substring(start, start + 50)}...`);
       }
     }
-    throw new Error("AI 回傳的內容不包含有效的 JSON 結構。");
+    throw new Error(`回傳內容沒有 JSON。原始內容: ${text.substring(0, 100)}...`);
   }
 }
 
