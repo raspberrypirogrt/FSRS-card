@@ -9,13 +9,16 @@ const ai = new GoogleGenAI({
 function extractJson(text: string) {
   if (!text) throw new Error("AI 沒有回傳任何內容 (可能是因為圖片過大或安全過濾機制攔截)。");
   
+  // 自動修復 AI 常犯的 LaTeX 單斜線轉義問題 (把 \ 改成 \\，但不影響 \" 與 \\)
+  const cleanedText = text.replace(/(?<!\\)\\([^\\"])/g, '\\\\$1');
+
   try {
-    return JSON.parse(text);
+    return JSON.parse(cleanedText);
   } catch(e) {
-    const firstBrace = text.indexOf('{');
-    const lastBrace = text.lastIndexOf('}');
-    const firstBracket = text.indexOf('[');
-    const lastBracket = text.lastIndexOf(']');
+    const firstBrace = cleanedText.indexOf('{');
+    const lastBrace = cleanedText.lastIndexOf('}');
+    const firstBracket = cleanedText.indexOf('[');
+    const lastBracket = cleanedText.lastIndexOf(']');
     
     let start = -1;
     let end = -1;
@@ -33,12 +36,12 @@ function extractJson(text: string) {
     
     if (start !== -1 && end !== -1) {
       try {
-        return JSON.parse(text.substring(start, end + 1));
+        return JSON.parse(cleanedText.substring(start, end + 1));
       } catch (e2) {
-        throw new Error(`無法解析 JSON。原始片段: ${text.substring(start, start + 50)}...`);
+        throw new Error(`無法解析 JSON。原始片段: ${cleanedText.substring(start, start + 50)}...`);
       }
     }
-    throw new Error(`回傳內容沒有 JSON。原始內容: ${text.substring(0, 100)}...`);
+    throw new Error(`回傳內容沒有 JSON。原始內容: ${cleanedText.substring(0, 100)}...`);
   }
 }
 
