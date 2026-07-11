@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+const ai = new GoogleGenAI({ 
+  apiKey: process.env.GEMINI_API_KEY || '',
+  httpOptions: { apiVersion: 'v1alpha' }
+});
 
 function extractJson(text: string) {
   if (!text) throw new Error("AI 沒有回傳任何內容 (可能是因為安全過濾機制攔截)。");
@@ -40,6 +43,7 @@ function extractJson(text: string) {
 }
 
 export async function POST(req: NextRequest) {
+  let rawAiResponse = '';
   try {
     if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json({ error: 'GEMINI_API_KEY 尚未設定' }, { status: 500 });
@@ -86,11 +90,18 @@ ${instruction}
       config: {
         systemInstruction: systemInstruction,
         temperature: 0.2,
+        maxOutputTokens: 8192,
         responseMimeType: "application/json",
       }
     });
 
     const textResponse = result.text || '';
+    rawAiResponse = textResponse;
+    
+    console.log("\n=== AI ASSIST RAW RESPONSE START ===");
+    console.log(rawAiResponse);
+    console.log("=== AI ASSIST RAW RESPONSE END ===\n");
+
     const rawText = textResponse.replace(/^```json/i, '').replace(/```$/i, '').trim();
     const parsedData = extractJson(rawText);
 
@@ -101,6 +112,9 @@ ${instruction}
 
   } catch (error: any) {
     console.error('AI Assist Error:', error);
-    return NextResponse.json({ error: error.message || 'AI 修改失敗' }, { status: 500 });
+    return NextResponse.json({ 
+      error: error.message || 'AI 修改失敗',
+      rawText: rawAiResponse
+    }, { status: 500 });
   }
 }

@@ -37,7 +37,15 @@ export function CardEditor({ initialFront = '', initialBack = '', onChange }: Ca
         body: JSON.stringify({ front, back, instruction: aiInstruction })
       });
       const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      if (data.error) {
+        if (data.rawText) {
+          console.error("=== AI Assist 原始回傳內容 (完整) ===");
+          console.error(data.rawText);
+          throw new Error(`${data.error}\n(詳細內容已印在 F12 Console)`);
+        } else {
+          throw new Error(data.error);
+        }
+      }
       
       setProposedFront(data.front);
       setProposedBack(data.back);

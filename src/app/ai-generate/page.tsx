@@ -140,8 +140,14 @@ export default function AIGeneratePage() {
 
       const data = await response.json();
       
-      if (!response.ok) {
-        throw new Error(data.error || '生成失敗');
+      if (data.error) {
+        if (data.rawText) {
+          console.error("=== AI 原始回傳內容 (完整) ===");
+          console.error(data.rawText);
+          throw new Error(`${data.error}\n(詳細內容已印在 F12 Console)`);
+        } else {
+          throw new Error(data.error);
+        }
       }
 
       // 為每張卡片加上 UUID，方便在列表中編輯與刪除

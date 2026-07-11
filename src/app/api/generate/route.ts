@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+const ai = new GoogleGenAI({ 
+  apiKey: process.env.GEMINI_API_KEY || '',
+  httpOptions: { apiVersion: 'v1alpha' } // 嘗試使用 v1alpha 以支援最新測試版模型
+});
 
 function extractJson(text: string) {
   if (!text) throw new Error("AI 沒有回傳任何內容 (可能是因為圖片過大或安全過濾機制攔截)。");
@@ -40,6 +43,7 @@ function extractJson(text: string) {
 }
 
 export async function POST(req: NextRequest) {
+  let rawAiResponse = '';
   try {
     if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json({ error: 'GEMINI_API_KEY 尚未設定' }, { status: 500 });
@@ -107,11 +111,17 @@ export async function POST(req: NextRequest) {
       config: {
         systemInstruction: systemInstruction,
         temperature: 0.2,
+        maxOutputTokens: 8192, // 明確指定最大 token，防止 Lite 模型提早截斷
         responseMimeType: "application/json",
       }
     });
 
     const textResponse = result.text || '';
+    rawAiResponse = textResponse; // 保存以便除錯
+
+    console.log("\n=== AI RAW RESPONSE START ===");
+    console.log(rawAiResponse);
+    console.log("=== AI RAW RESPONSE END ===\n");
       
     // 進行手動清理與防呆
     const rawText = textResponse.replace(/^```json/i, '').replace(/```$/i, '').trim();
@@ -128,6 +138,9 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('AI Generation Error:', error);
-    return NextResponse.json({ error: error.message || '生成失敗' }, { status: 500 });
+    return NextResponse.json({ 
+      error: error.message || '生成失敗',
+      rawText: rawAiResponse
+    }, { status: 500 });
   }
 }
