@@ -9,7 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
+    "@google/genai": "^2.11.0",
     "@supabase/supabase-js": "^2.110.2",
     "dexie": "^4.4.4",
     "dexie-react-hooks": "^4.4.0",

@@ -17,8 +17,11 @@ interface GeneratedCard {
 }
 
 const AI_MODELS = [
+  { id: 'gemini-3-flash', name: 'Gemini 3 Flash' },
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
   { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
+  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash' },
+  { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite' },
 ];
 
 export default function AIGeneratePage() {
@@ -26,7 +29,7 @@ export default function AIGeneratePage() {
   const { showToast } = useToast();
   
   const [selectedDeckId, setSelectedDeckId] = useState('');
-  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.1-flash-lite');
   const [sourceText, setSourceText] = useState('');
   const [filePreview, setFilePreview] = useState<string>('');
   
