@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'GEMINI_API_KEY 尚未設定' }, { status: 500 });
     }
 
-    const { text, prompt, fileBase64, mimeType, modelId } = await req.json();
+    const { text, prompt, files, modelId } = await req.json();
 
     const selectedModel = modelId || 'gemini-3.1-flash-lite';
 
@@ -69,12 +69,16 @@ export async function POST(req: NextRequest) {
       parts.push({ text: `\n文本內容：\n${text}` });
     }
 
-    // 如果有圖片
-    if (fileBase64 && mimeType) {
-      parts.push({
-        inlineData: {
-          data: fileBase64,
-          mimeType: mimeType
+    // 如果有多張圖片
+    if (files && Array.isArray(files)) {
+      files.forEach((file) => {
+        if (file.data && file.mimeType) {
+          parts.push({
+            inlineData: {
+              data: file.data,
+              mimeType: file.mimeType
+            }
+          });
         }
       });
     }

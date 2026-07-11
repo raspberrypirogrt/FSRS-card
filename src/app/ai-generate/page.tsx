@@ -31,9 +31,8 @@ export default function AIGeneratePage() {
   const [selectedDeckId, setSelectedDeckId] = useState('');
   const [selectedModel, setSelectedModel] = useState('gemini-3.1-flash-lite');
   const [sourceText, setSourceText] = useState('');
-  const [filePreview, setFilePreview] = useState<string>('');
+  const [filePreviews, setFilePreviews] = useState<{data: string, mimeType: string, id: string}[]>([]);
   
-  const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedCards, setGeneratedCards] = useState<GeneratedCard[]>([]);
   
@@ -57,55 +56,70 @@ export default function AIGeneratePage() {
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
-
+    if (!e.target.files || e.target.files.length === 0) return;
+    
+    setIsGenerating(true);
     try {
-      setIsProcessingFile(true);
-      const fileType = selectedFile.type;
+      let appendedText = '';
+      const newPreviews = [...filePreviews];
 
-      // 如果是 PDF
-      if (fileType === 'application/pdf') {
-        const arrayBuffer = await selectedFile.arrayBuffer();
-        const text = await extractPdfText(arrayBuffer);
-        setSourceText(prev => prev + (prev ? '\n\n' : '') + text);
-        showToast('PDF 文字萃取成功，已加入文本框中', 'success');
-        setFilePreview(''); // 清除圖片預覽
-      } 
-      // 如果是 Word (.docx)
-      else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-        const arrayBuffer = await selectedFile.arrayBuffer();
-        const result = await mammoth.extractRawText({ arrayBuffer });
-        setSourceText(prev => prev + (prev ? '\n\n' : '') + result.value);
-        showToast('Word 文字萃取成功，已加入文本框中', 'success');
-        setFilePreview('');
-      }
-      // 如果是圖片 (支援直接送給 Gemini)
-      else if (fileType.startsWith('image/')) {
-        if (selectedFile.size > 4 * 1024 * 1024) {
-          showToast('圖片大小不能超過 4MB', 'warning');
-          return;
+      for (let i = 0; i < e.target.files.length; i++) {
+        const file = e.target.files[i];
+        
+        if (file.type === 'application/pdf') {
+          showToast(`正在解析 PDF: ${file.name}...`, 'info');
+          const arrayBuffer = await file.arrayBuffer();
+          const text = await extractPdfText(arrayBuffer);
+          appendedText += `\n\n--- PDF: ${file.name} ---\n${text}`;
+          showToast(`已成功解析 PDF: ${file.name}`, 'success');
+        } else if (file.name.endsWith('.docx')) {
+          showToast(`正在解析 Word: ${file.name}...`, 'info');
+          const arrayBuffer = await file.arrayBuffer();
+          const result = await mammoth.extractRawText({ arrayBuffer });
+          appendedText += `\n\n--- DOCX: ${file.name} ---\n${result.value}`;
+          showToast(`已成功解析 Word: ${file.name}`, 'success');
+        } else if (file.type.startsWith('image/')) {
+          const base64Data = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const result = reader.result as string;
+              resolve(result.split(',')[1]); // Only keep base64 data
+            };
+            reader.readAsDataURL(file);
+          });
+          
+          newPreviews.push({
+            id: Math.random().toString(36).substring(7),
+            data: base64Data,
+            mimeType: file.type
+          });
+        } else {
+          showToast(`不支援的檔案格式: ${file.name}`, 'error');
         }
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setFilePreview(reader.result as string);
-        };
-        reader.readAsDataURL(selectedFile);
-      } else {
-        showToast('不支援的檔案格式，請上傳圖片、PDF 或 Word (.docx)', 'error');
       }
-    } catch (error) {
-      console.error('File extraction error:', error);
+
+      if (appendedText) {
+        setSourceText(prev => prev + appendedText);
+      }
+      setFilePreviews(newPreviews);
+      
+    } catch (err) {
+      console.error(err);
       showToast('檔案解析失敗', 'error');
     } finally {
-      setIsProcessingFile(false);
-      // 重置 input，讓同一個檔案可以重複選取
-      if (e.target) e.target.value = '';
+      setIsGenerating(false);
+      // 清空 input 讓同一個檔案可以重複選取
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
     }
   };
 
+  const removeFilePreview = (idToRemove: string) => {
+    setFilePreviews(prev => prev.filter(p => p.id !== idToRemove));
+  };
+
   const handleGenerate = async () => {
-    if (!sourceText.trim() && !filePreview) {
+    if (!sourceText.trim() && filePreviews.length === 0) {
       showToast('請輸入文本或上傳圖片', 'warning');
       return;
     }
@@ -113,27 +127,15 @@ export default function AIGeneratePage() {
     setIsGenerating(true);
     
     try {
-      let fileBase64 = '';
-      let mimeType = '';
-      
-      if (filePreview) {
-        const parts = filePreview.split(',');
-        if (parts.length === 2) {
-          const match = parts[0].match(/:(.*?);/);
-          if (match) mimeType = match[1];
-          fileBase64 = parts[1];
-        }
-      }
-
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: sourceText,
-          fileBase64,
-          mimeType,
+          prompt: "請萃取重點，並轉換為卡片。",
+          files: filePreviews,
           modelId: selectedModel
-        })
+        }),
       });
 
       const data = await response.json();
@@ -194,7 +196,7 @@ export default function AIGeneratePage() {
       showToast(`成功儲存 ${successCount} 張卡片到牌組！`, 'success');
       setGeneratedCards([]);
       setSourceText('');
-      setFilePreview('');
+      setFilePreviews([]);
       
     } catch (error) {
       showToast('儲存失敗，請稍後再試', 'error');
@@ -230,74 +232,78 @@ export default function AIGeneratePage() {
             
             <div className="input-group" style={{ marginBottom: 'var(--space-md)' }}>
               <label className="input-label">📝 貼上文本 / 講義文字</label>
+              <div style={{ display: 'flex', gap: 'var(--space-sm)', marginBottom: 'var(--space-sm)' }}>
+                      <button 
+                        className="btn btn-secondary" 
+                        onClick={() => fileInputRef.current?.click()}
+                        style={{ flex: 1, justifyContent: 'center' }}
+                      >
+                        📁 選擇檔案 (支援多選圖片/PDF/Word)
+                      </button>
+                      <button 
+                        className="btn btn-secondary" 
+                        onClick={() => cameraInputRef.current?.click()}
+                        style={{ flex: 1, justifyContent: 'center' }}
+                      >
+                        📷 拍照上傳
+                      </button>
+                    </div>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      style={{ display: 'none' }} 
+                      accept="image/*,.pdf,.docx" 
+                      multiple
+                      onChange={handleFileChange}
+                    />
+                    <input 
+                      type="file" 
+                      ref={cameraInputRef} 
+                      style={{ display: 'none' }} 
+                      accept="image/*" 
+                      capture="environment"
+                      multiple
+                      onChange={handleFileChange}
+                    />
               <textarea 
                 className="textarea" 
                 rows={6} 
-                placeholder="在此貼上筆記內容... 或是上傳 PDF/Word 檔案自動為您解析填入。"
+                placeholder="在此貼上筆記內容. 或是上傳 PDF/Word 檔案自動為您解析填入。"
                 value={sourceText}
                 onChange={e => setSourceText(e.target.value)}
               />
             </div>
 
             <div className="input-group" style={{ marginBottom: 'var(--space-xl)' }}>
-              <label className="input-label">📁 上傳檔案或拍照 (支援 PDF, Word, 圖片)</label>
-              <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
-                {/* 檔案上傳 */}
-                <button 
-                  className="btn btn-secondary" 
-                  style={{ flex: 1 }}
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isProcessingFile}
-                >
-                  {isProcessingFile ? '解析中...' : '📂 選擇檔案'}
-                </button>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleFileChange} 
-                  accept=".pdf, .docx, image/*" 
-                  style={{ display: 'none' }} 
-                />
-                
-                {/* 拍照 */}
-                <button 
-                  className="btn btn-secondary" 
-                  style={{ flex: 1 }}
-                  onClick={() => cameraInputRef.current?.click()}
-                  disabled={isProcessingFile}
-                >
-                  📷 拍照上傳
-                </button>
-                <input 
-                  type="file" 
-                  ref={cameraInputRef} 
-                  onChange={handleFileChange} 
-                  accept="image/*" 
-                  capture="environment" 
-                  style={{ display: 'none' }} 
-                />
-              </div>
-
               {/* 圖片預覽區塊 */}
-              {filePreview && (
-                <div style={{ marginTop: 'var(--space-md)', position: 'relative', display: 'inline-block' }}>
-                  <img src={filePreview} alt="預覽" style={{ maxHeight: '150px', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }} />
-                  <button 
-                    className="btn-icon" 
-                    style={{ position: 'absolute', top: -10, right: -10, background: 'var(--danger)', color: 'white' }}
-                    onClick={() => setFilePreview('')}
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
+              {filePreviews.length > 0 && (
+                    <div style={{ marginTop: 'var(--space-md)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-sm)' }}>
+                      {filePreviews.map((preview) => (
+                        <div key={preview.id} style={{ position: 'relative', width: '100px', height: '100px' }}>
+                          <img 
+                            src={`data:${preview.mimeType};base64,${preview.data}`} 
+                            alt="preview" 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)' }} 
+                          />
+                          <button 
+                            className="btn-icon btn-ghost" 
+                            style={{ position: 'absolute', top: -8, right: -8, background: 'var(--surface)', border: '1px solid var(--glass-border)', borderRadius: '50%', padding: '4px', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            onClick={() => removeFilePreview(preview.id)}
+                            title="移除圖片"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
             </div>
 
             <button 
               className="btn btn-primary btn-lg" 
               style={{ width: '100%' }}
               onClick={handleGenerate}
-              disabled={isGenerating || (!sourceText.trim() && !filePreview)}
+              disabled={isGenerating || (!sourceText.trim() && filePreviews.length === 0)}
             >
               {isGenerating ? '🔄 AI 正在萃取知識點...' : '✨ 魔術生成'}
             </button>
